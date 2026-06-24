@@ -41,7 +41,7 @@ piloto inicializar_piloto(int registro, piloto a){
     // competencias entre 1 y 200
     a.Competencias = (rand() % 200) + 1;
     // costo entre 1000 y 100000
-    a.costo = (rand() % 99001) + 1000; 
+    a.costo = (rand() % 99001) + 1000;
     return a;
 }
 
@@ -153,7 +153,7 @@ void dp_bottom_up(piloto p[], int tamano, int presupuesto) {
     if (!dp) return;
     for (int i = 0; i <= tamano; i++) {
         dp[i] = (float *)calloc(presupuesto + 1, sizeof(float));
-        if (!dp[i]) { // Proteccion por si se acaba la RAM con tamaños muy grandes
+        if (!dp[i]) {
             printf("[Error] Memoria insuficiente para DP Bottom-Up con presupuesto %d y tamano %d\n", presupuesto, tamano);
             for(int j = 0; j < i; j++) free(dp[j]);
             free(dp);
@@ -174,21 +174,41 @@ void dp_bottom_up(piloto p[], int tamano, int presupuesto) {
         }
     }
 
-    // Reconstruccion de la solucion (Que pilotos fueron elegidos)
-    int w = presupuesto, costo_total = 0, seleccionados = 0;
+    // Reconstruccion de la solucion: rastrear hacia atras para identificar quienes se eligieron
+    int w = presupuesto;
+    int costo_total = 0;
+    int seleccionados = 0;
     float puntaje_total = dp[tamano][presupuesto];
 
-    for (int i = tamano; i > 0 && w > 0; i--) {
-        if (dp[i][w] != dp[i-1][w]) { // Si es diferente, significa que lo incluimos
-            costo_total += p[i-1].costo;
+    // Primero contamos para saber cuantos hay
+    int w_tmp = presupuesto;
+    for (int i = tamano; i > 0 && w_tmp > 0; i--) {
+        if (dp[i][w_tmp] != dp[i-1][w_tmp]) {
             seleccionados++;
-            w -= p[i-1].costo;
+            w_tmp -= p[i-1].costo;
         }
     }
 
     printf("\n=== EQUIPO SELECCIONADO (DP Bottom-Up) ===\n");
-    printf("Estrategia Optima Garantizada\n");
-    printf("Total Seleccionados: %d\nCosto Total: %d / %d\nPuntaje Total: %.2f\n", seleccionados, costo_total, presupuesto, puntaje_total);
+    printf("Estrategia: Optima Garantizada\n");
+    printf("Total Seleccionados: %d | Costo Total: %d / %d | Puntaje Total: %.2f\n\n",
+           seleccionados, 0, presupuesto, puntaje_total);
+    printf("%-5s %-12s %-15s %-10s %-8s\n", "N°", "Nombre", "Equipo", "Puntaje", "Costo");
+    printf("------------------------------------------------------------\n");
+
+    int num = 1;
+    for (int i = tamano; i > 0 && w > 0; i--) {
+        if (dp[i][w] != dp[i-1][w]) {
+            costo_total += p[i-1].costo;
+            printf("%-5d %-12s %-15s %-10.2f %-8d\n",
+                   num++, p[i-1].Nombre, p[i-1].Equipo, p[i-1].Puntaje, p[i-1].costo);
+            w -= p[i-1].costo;
+        }
+    }
+
+    printf("------------------------------------------------------------\n");
+    printf("TOTAL: %d deportistas | Costo: %d / %d | Puntaje: %.2f\n",
+           seleccionados, costo_total, presupuesto, puntaje_total);
 
     for (int i = 0; i <= tamano; i++) free(dp[i]);
     free(dp);
@@ -197,7 +217,7 @@ void dp_bottom_up(piloto p[], int tamano, int presupuesto) {
 // Helper recursivo para Top-Down
 float recursivo_top_down(piloto p[], int i, int w, float **memo) {
     if (i < 0 || w <= 0) return 0.0f;
-    if (memo[i][w] != -1.0f) return memo[i][w]; // Si ya esta calculado, lo retorna
+    if (memo[i][w] != -1.0f) return memo[i][w];
 
     if (p[i].costo > w) {
         memo[i][w] = recursivo_top_down(p, i - 1, w, memo);
@@ -215,35 +235,55 @@ void dp_top_down(piloto p[], int tamano, int presupuesto) {
     if (!memo) return;
     for (int i = 0; i < tamano; i++) {
         memo[i] = (float *)malloc((presupuesto + 1) * sizeof(float));
-        if (!memo[i]) { // Proteccion por si se acaba la memoria
+        if (!memo[i]) {
             printf("[Error] Memoria insuficiente para DP Top-Down\n");
             for(int j = 0; j < i; j++) free(memo[j]);
             free(memo);
             return;
         }
-        for (int w = 0; w <= presupuesto; w++) memo[i][w] = -1.0f; // Inicializa vacio
+        for (int w = 0; w <= presupuesto; w++) memo[i][w] = -1.0f;
     }
 
     float puntaje_total = recursivo_top_down(p, tamano - 1, presupuesto, memo);
 
     // Reconstruccion de la solucion Top-Down
-    int w = presupuesto, costo_total = 0, seleccionados = 0;
+    int w = presupuesto;
+    int costo_total = 0;
+    int seleccionados = 0;
 
-    for (int i = tamano - 1; i >= 0 && w > 0; i--) {
-        float actual = memo[i][w];
-        float anterior = (i > 0) ? recursivo_top_down(p, i - 1, w, memo) : 0.0f;
-
-        // Si el valor actual es distinto al del elemento anterior, significa que p[i] se uso en el equipo
+    // Primera pasada: contar seleccionados
+    int w_tmp = presupuesto;
+    for (int i = tamano - 1; i >= 0 && w_tmp > 0; i--) {
+        float actual   = memo[i][w_tmp];
+        float anterior = (i > 0) ? recursivo_top_down(p, i - 1, w_tmp, memo) : 0.0f;
         if (actual != anterior) {
-            costo_total += p[i].costo;
             seleccionados++;
-            w -= p[i].costo;
+            w_tmp -= p[i].costo;
         }
     }
 
     printf("\n=== EQUIPO SELECCIONADO (DP Top-Down) ===\n");
-    printf("Estrategia Optima Garantizada\n");
-    printf("Total Seleccionados: %d\nCosto Total: %d / %d\nPuntaje Total: %.2f\n", seleccionados, costo_total, presupuesto, puntaje_total);
+    printf("Estrategia: Optima Garantizada\n");
+    printf("Total Seleccionados: %d | Puntaje Total: %.2f\n\n", seleccionados, puntaje_total);
+    printf("%-5s %-12s %-15s %-10s %-8s\n", "N°", "Nombre", "Equipo", "Puntaje", "Costo");
+    printf("------------------------------------------------------------\n");
+
+    int num = 1;
+    for (int i = tamano - 1; i >= 0 && w > 0; i--) {
+        float actual   = memo[i][w];
+        float anterior = (i > 0) ? recursivo_top_down(p, i - 1, w, memo) : 0.0f;
+
+        if (actual != anterior) {
+            costo_total += p[i].costo;
+            printf("%-5d %-12s %-15s %-10.2f %-8d\n",
+                   num++, p[i].Nombre, p[i].Equipo, p[i].Puntaje, p[i].costo);
+            w -= p[i].costo;
+        }
+    }
+
+    printf("------------------------------------------------------------\n");
+    printf("TOTAL: %d deportistas | Costo: %d / %d | Puntaje: %.2f\n",
+           seleccionados, costo_total, presupuesto, puntaje_total);
 
     for (int i = 0; i < tamano; i++) free(memo[i]);
     free(memo);
@@ -280,30 +320,45 @@ void greedy_con_restriccion(piloto p[], int tamano, int presupuesto, int criteri
     if (!copia) return;
     for(int i = 0; i < tamano; i++) copia[i] = p[i];
 
+    const char *nombre_criterio;
     if (criterio == 1) {
         qsort(copia, tamano, sizeof(piloto), cmp_mayor_puntaje);
-        printf("\n--- Greedy por Mayor Puntaje ---\n");
+        nombre_criterio = "Mayor Puntaje";
     } else if (criterio == 2) {
         qsort(copia, tamano, sizeof(piloto), cmp_menor_costo);
-        printf("\n--- Greedy por Menor Costo ---\n");
-    } else if (criterio == 3) {
+        nombre_criterio = "Menor Costo";
+    } else {
         qsort(copia, tamano, sizeof(piloto), cmp_mejor_ratio);
-        printf("\n--- Greedy por Mejor Ratio (Puntaje/Costo) ---\n");
+        nombre_criterio = "Mejor Ratio (Puntaje/Costo)";
     }
 
+    // Guardar los seleccionados para mostrarlos y para contraejemplos
+    piloto *seleccion = (piloto *)malloc(tamano * sizeof(piloto));
     int seleccionados = 0;
     int costo_total = 0;
     float puntaje_total = 0.0f;
 
     for (int i = 0; i < tamano; i++) {
         if (costo_total + copia[i].costo <= presupuesto) {
+            seleccion[seleccionados++] = copia[i];
             costo_total += copia[i].costo;
             puntaje_total += copia[i].Puntaje;
-            seleccionados++;
         }
     }
 
-    printf("Total Seleccionados: %d\nCosto Total: %d / %d\nPuntaje Total: %.2f\n", seleccionados, costo_total, presupuesto, puntaje_total);
+    printf("\n--- Greedy por %s ---\n", nombre_criterio);
+    printf("%-5s %-12s %-15s %-10s %-8s\n", "N°", "Nombre", "Equipo", "Puntaje", "Costo");
+    printf("------------------------------------------------------------\n");
+    for (int i = 0; i < seleccionados; i++) {
+        printf("%-5d %-12s %-15s %-10.2f %-8d\n",
+               i + 1, seleccion[i].Nombre, seleccion[i].Equipo,
+               seleccion[i].Puntaje, seleccion[i].costo);
+    }
+    printf("------------------------------------------------------------\n");
+    printf("TOTAL: %d deportistas | Costo: %d / %d | Puntaje: %.2f\n",
+           seleccionados, costo_total, presupuesto, puntaje_total);
+
+    free(seleccion);
     free(copia);
 }
 
@@ -317,15 +372,20 @@ void greedy_sin_restriccion(piloto p[], int tamano, int cantidad) {
     qsort(copia, tamano, sizeof(piloto), cmp_mayor_puntaje);
     
     printf("\n--- Greedy Sin Restriccion (Top %d Mejores por Puntaje) ---\n", cantidad);
-    
+    printf("%-5s %-12s %-15s %-10s %-8s\n", "N°", "Nombre", "Equipo", "Puntaje", "Costo");
+    printf("------------------------------------------------------------\n");
+
     int costo_total = 0;
     float puntaje_total = 0.0f;
     
     for (int i = 0; i < cantidad; i++) {
         costo_total += copia[i].costo;
         puntaje_total += copia[i].Puntaje;
+        printf("%-5d %-12s %-15s %-10.2f %-8d\n",
+               i + 1, copia[i].Nombre, copia[i].Equipo, copia[i].Puntaje, copia[i].costo);
     }
-    
-    printf("Total Seleccionados: %d\nCosto Total: %d\nPuntaje Total: %.2f\n", cantidad, costo_total, puntaje_total);
+
+    printf("------------------------------------------------------------\n");
+    printf("TOTAL: %d deportistas | Costo: %d | Puntaje: %.2f\n", cantidad, costo_total, puntaje_total);
     free(copia);
 }
